@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<!--
+  - SPDX-FileCopyrightText: 2023 Nextcloud GmbH and Nextcloud contributors
+  - SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<info>
+	<id>workflow_ocr_backend</id>
+	<name>Workflow OCR Backend</name>
+	<summary>Alternative backend for Workflow OCR App</summary>
+	<description>
+	<![CDATA[This is the Python backend for the Workflow OCR App.  
+It contains a small REST API that encapsulates the OCRmyPDF functionality.
+
+For more information, see https://github.com/R0Wi-DEV/workflow_ocr_backend. 
+]]></description>
+	<version>1.0.0</version>
+	<licence>agpl</licence>
+	<author mail="ro.windey@gmail.com" homepage="https://github.com/R0Wi">Robin Windey</author>
+	<namespace>Workflow OCR Backend</namespace>
+		<category>files</category>
+	<category>tools</category>
+	<category>organization</category>
+	<category>workflow</category>
+	<website>https://github.com/R0Wi-DEV/workflow_ocr_backend</website>
+	<bugs>https://github.com/R0Wi-DEV/workflow_ocr_backend/issues</bugs>
+	<repository type="git">https://github.com/R0Wi-DEV/workflow_ocr_backend.git</repository>
+	<dependencies>
+		<nextcloud min-version="31" max-version="31"/>
+	</dependencies>
+	<external-app>
+		<docker-install>
+			<registry>ghcr.io</registry>
+			<image>r0wi-dev/workflow_ocr_backend</image>
+			<image-tag>1.0.0</image-tag>
+		</docker-install>
+	</external-app>
+</info>
