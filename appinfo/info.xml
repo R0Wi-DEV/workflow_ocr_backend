@@ -13,7 +13,7 @@ It contains a small REST API that encapsulates the OCRmyPDF functionality.
 
 For more information, see https://github.com/R0Wi-DEV/workflow_ocr_backend. 
 ]]></description>
-	<version>1.32.0-dev</version>
+	<version>1.32.0-hrp</version>
 	<licence>agpl</licence>
 	<author mail="ro.windey@gmail.com" homepage="https://github.com/R0Wi">Robin Windey</author>
 	<namespace>Workflow OCR Backend</namespace>
@@ -31,7 +31,7 @@ For more information, see https://github.com/R0Wi-DEV/workflow_ocr_backend.
 		<docker-install>
 			<registry>ghcr.io</registry>
 			<image>r0wi-dev/workflow_ocr_backend</image>
-			<image-tag>master</image-tag>
+			<image-tag>copilot-add-harp-support</image-tag>
 		</docker-install>
 	</external-app>
 </info>
