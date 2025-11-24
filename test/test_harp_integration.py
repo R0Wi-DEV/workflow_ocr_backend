@@ -102,7 +102,7 @@ def test_harp_deploys_and_configures_frp(tmp_path):
             "harp-shared-key": shared_key,
             "EX-APP-ID": exapp_name,
             "AUTHORIZATION-APP-API": "test-token",
-            "AA-VERSION": env_vars.get("AA_VERSION", "32"),
+            "AA-VERSION": env_vars.get("AA_VERSION", "33"),
         }
 
         # Wait for HaRP agent to be ready via ExApps app_api
@@ -262,7 +262,7 @@ def _wait_for_agent_ready_via_exapps(http_client: httpx.Client, exapps_base: str
     # Ask HaRP to use the local (built-in) Docker Engine remote port.
     probe_headers.setdefault("docker-engine-port", str(LOCAL_DOCKER_ENGINE_PORT))
     # AA-VERSION isn't relevant for app_api ping but keep a sane default
-    probe_headers.setdefault("AA-VERSION", "32")
+    probe_headers.setdefault("AA-VERSION", "33")
 
     ping_path = "/exapps/app_api/v1.41/_ping"
     deadline = time.time() + AGENT_TIMEOUT
