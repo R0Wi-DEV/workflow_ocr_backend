@@ -58,7 +58,7 @@ def test_process_ocr_error_already_processed_file():
     assert response.status_code == 500
     response_json = response.json()
     assert "message" in response_json
-    assert response_json["message"] == "page already has text! - aborting (use --force-ocr to force OCR;  see also help for the arguments --skip-text and --redo-ocr (PriorOcrFoundError)"
+    assert response_json["message"] == "page already has text! - aborting (use --force-ocr or --mode force to force OCR; see also help for --skip-text, --redo-ocr, and --mode) (PriorOcrFoundError)"
     assert "ocrMyPdfExitCode" in response_json
     assert response_json["ocrMyPdfExitCode"] == 6
 
