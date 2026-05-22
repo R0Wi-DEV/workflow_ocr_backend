@@ -24,7 +24,7 @@ APP.add_middleware(AppAPIAuthMiddleware, disable_for=["docs", "openapi.json"])
 logger = logging.getLogger('uvicorn.error') # Use same logging as uvicorn
 
 
-def enabled_handler(enabled: bool, _: NextcloudApp | AsyncNextcloudApp) -> str:
+async def enabled_handler(enabled: bool, _: AsyncNextcloudApp) -> str:
     # Nothing to do currently ...
     logger.debug(f"App enabled: {enabled}")
     return ""

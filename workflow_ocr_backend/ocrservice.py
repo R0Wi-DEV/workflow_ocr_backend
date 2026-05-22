@@ -57,7 +57,7 @@ class OcrService:
             if not param:
                 continue
             splitted_param = [p.strip() for p in param.split(" ")]
-            key = splitted_param[0]
+            key = splitted_param[0].replace("-", "_")
             length = len(splitted_param)
             if length >= 2:
                 value = splitted_param[1]
