@@ -10,6 +10,7 @@ It's written in Python and provides a simple REST API for [ocrmypdf](https://ocr
   - [Installation](#installation)
   - [`docker-compose` Example](#docker-compose-example)
   - [HaRP Support (Nextcloud 32+)](#harp-support-nextcloud-32)
+- [OCR Parameter Validation](#ocr-parameter-validation)
 
 ## Prerequisites
 
@@ -175,3 +176,11 @@ Since Nextcloud 32, [HaRP (AppAPI HaProxy Reversed Proxy)](https://github.com/ne
 HaRP simplifies deployment and improves performance by enabling direct communication between clients and ExApps. The implementation is fully backward compatible with Docker Socket Proxy deployments.
 
 For installation and migration instructions, see the [HaRP documentation](https://github.com/nextcloud/HaRP#readme).
+
+## OCR Parameter Validation
+
+The `ocrmypdf_parameters` sent to `/process_ocr` are validated before they are handed over to OCRmyPDF:
+
+- Only documented keyword arguments of [`ocrmypdf.ocr()`](https://ocrmypdf.readthedocs.io/en/latest/api.html) are accepted. Unknown parameters are rejected with HTTP `400` instead of being silently ignored.
+- The parameters `plugins`, `plugin_manager`, `user_words`, `user_patterns`, `keep_temporary_files` as well as the input/output/sidecar parameters (which are controlled by this app) are never accepted from a request. `--plugins` in particular would make OCRmyPDF load and execute arbitrary Python code.
+- Language codes must match `^[A-Za-z][A-Za-z0-9_/]{0,31}$` (e.g. `eng`, `chi_sim`, `script/Latin`), which is the same allow-list the [workflow_ocr](https://github.com/R0Wi-DEV/workflow_ocr) Nextcloud App uses.
