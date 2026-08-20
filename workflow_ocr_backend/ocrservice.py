@@ -67,6 +67,15 @@ class OcrService:
         return self.ocr(file, file_name, options, policy)
 
     def installed_languages(self) -> Iterable[str]:
-        result = subprocess.run(["tesseract", "--list-langs"], capture_output=True, text=True)
+        # check=True + a timeout: this result seeds OcrPolicy at startup, so a
+        # tesseract failure here must fail loudly rather than silently produce
+        # an empty language set that then rejects every OCR request as 400.
+        try:
+            result = subprocess.run(
+                ["tesseract", "--list-langs"], capture_output=True, text=True, check=True, timeout=30
+            )
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            self.logger.error(f"Could not determine installed tesseract languages: {exc}")
+            raise
         languages = result.stdout.splitlines()[1:]  # Skip the first line
         return [lang for lang in languages if lang != "osd"]

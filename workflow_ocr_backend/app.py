@@ -13,11 +13,25 @@ import logging
 from ocrmypdf import ExitCodeException
 from pydantic import ValidationError
 
-from .model.ocrresult import ErrorResult, OcrResult
+from .model.ocrresult import ErrorResult, OcrResult, ValidationErrorResult
 from .ocroptions import InvalidOcrOptionsError, OcrOptions, OcrPolicy
 from .ocrservice import OcrService
 
 logger = logging.getLogger('uvicorn.error') # Use same logging as uvicorn
+
+
+class ConfigurationError(RuntimeError):
+    """Raised when an OCR_* environment variable can't be parsed at startup."""
+
+
+def _env_number(name: str, cast: type) -> int | float | None:
+    value = os.getenv(name)
+    if value is None:
+        return None
+    try:
+        return cast(value)
+    except ValueError as exc:
+        raise ConfigurationError(f"Environment variable {name}={value!r} is not a valid {cast.__name__}") from exc
 
 
 def _policy_from_env(installed_languages: frozenset[str]) -> OcrPolicy:
@@ -28,13 +42,19 @@ def _policy_from_env(installed_languages: frozenset[str]) -> OcrPolicy:
     pin the whole backend, which only takes one OCRmyPDF task at a time.
     """
     kwargs = {}
-    if (v := os.getenv("OCR_JOBS")) is not None:
-        kwargs["jobs"] = int(v)
-    if (v := os.getenv("OCR_MAX_IMAGE_MPIXELS")) is not None:
-        kwargs["max_image_mpixels"] = float(v)
-    if (v := os.getenv("OCR_MAX_TESSERACT_TIMEOUT_S")) is not None:
-        kwargs["max_tesseract_timeout_s"] = float(v)
-    return OcrPolicy(installed_languages=installed_languages, **kwargs)
+    if (v := _env_number("OCR_JOBS", int)) is not None:
+        kwargs["jobs"] = v
+    if (v := _env_number("OCR_MAX_IMAGE_MPIXELS", float)) is not None:
+        kwargs["max_image_mpixels"] = v
+    if (v := _env_number("OCR_MAX_TESSERACT_TIMEOUT_S", float)) is not None:
+        kwargs["max_tesseract_timeout_s"] = v
+    try:
+        return OcrPolicy(installed_languages=installed_languages, **kwargs)
+    except ValidationError as exc:
+        # e.g. OCR_JOBS=0 or OCR_MAX_IMAGE_MPIXELS=-1 - well-formed numbers, but
+        # outside OcrPolicy's own bounds. Fail fast with a clear message rather
+        # than an opaque pydantic stacktrace at import time.
+        raise ConfigurationError(f"Invalid OCR policy configuration: {exc}") from exc
 
 
 @asynccontextmanager
@@ -75,22 +95,30 @@ async def invalid_ocr_options_exception_handler(_: Request, exc: InvalidOcrOptio
 async def validation_error_exception_handler(_: Request, exc: ValidationError):
     # Schema validation of the "options" body -> 422 with field-level detail,
     # matching FastAPI's own convention for an invalid request body.
-    return JSONResponse({"message": "Invalid OCR options", "errors": exc.errors(include_url=False, include_context=False)}, status_code=422)
+    body = ValidationErrorResult(
+        message="Invalid OCR options",
+        errors=exc.errors(include_url=False, include_context=False),
+    )
+    return JSONResponse(body.model_dump(by_alias=True), status_code=422)
 
 @APP.exception_handler(Exception)
 async def exception_handler(_: Request, exc: Exception):
     # Never echo str(exc) here: exception text routinely carries absolute temp
-    # paths and library internals. Log the detail server-side against a
-    # correlation id and return only that id to the caller.
+    # paths and library internals. Log the full exception (message + traceback)
+    # server-side against a correlation id, and return only that id to the
+    # caller. exc_info is passed explicitly rather than relying on the ambient
+    # sys.exc_info() - this handler runs as an awaited coroutine, and passing
+    # the exception directly guarantees the right traceback is logged
+    # regardless of how the framework dispatches to it.
     correlation_id = str(uuid.uuid4())
-    logger.exception(f"Unhandled error [{correlation_id}]")
+    logger.error(f"Unhandled error [{correlation_id}]", exc_info=exc)
     return JSONResponse({"message": f"Internal server error [{correlation_id}]"}, status_code=500)
 
 
 @APP.post(
     "/v1/ocr",
     response_model=OcrResult,
-    responses={400: {"model": ErrorResult}, 422: {"model": ErrorResult}, 500: {"model": ErrorResult}},
+    responses={400: {"model": ErrorResult}, 422: {"model": ValidationErrorResult}, 500: {"model": ErrorResult}},
 )
 def ocr_v1(
         response: Response,
@@ -141,7 +169,8 @@ def process_ocr(
     """
     service = OcrService(logger)
     response.headers["Deprecation"] = "true"
-    response.headers["Sunset"] = "Wed, 01 Jul 2026 00:00:00 GMT"
+    # Revisit alongside the workflow_ocr app release that switches to /v1/ocr.
+    response.headers["Sunset"] = "Mon, 01 Feb 2027 00:00:00 GMT"
     response.headers["Link"] = '</v1/ocr>; rel="successor-version"'
     return service.ocr_legacy(file.file, file.filename, ocrmypdf_parameters, get_policy())
 

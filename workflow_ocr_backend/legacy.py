@@ -27,8 +27,10 @@ class InvalidOcrParameterError(InvalidOcrOptionsError):
 
 
 # Boolean "presence" flags that select OcrOptions.mode instead of a same-named
-# field. Mutually exclusive by construction - the last one seen wins, matching
-# the OcrOptions default of TextMode.SKIP when none are present.
+# field. Mutually exclusive by construction - the last one seen wins. When none
+# of these are present, options_from_legacy_parameters leaves "mode" unset, so
+# OcrOptions falls back to its own default (None: no override, matching
+# OCRmyPDF's conservative default of erroring on an already-OCR'd document).
 _MODE_FLAGS: Final[dict[str, TextMode]] = {
     "skip_text": TextMode.SKIP,
     "force_ocr": TextMode.FORCE,
