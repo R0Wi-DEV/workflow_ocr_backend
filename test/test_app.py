@@ -169,7 +169,10 @@ def test_ocr_v1_rejects_uninstalled_language():
         response = client.post(
             "/v1/ocr",
             files={"file": (file_name, file, "application/pdf")},
-            data={"options": '{"languages": ["jpn"]}'}
+            # Not a real tesseract language pack, and the CI/production image installs
+            # every language ocrmypdf-data ships (see doc/CODE_REVIEW.md BP-7), so a
+            # real-but-uninstalled code like "jpn" isn't a safe fixture here.
+            data={"options": '{"languages": ["zzzzzz"]}'}
         )
     assert response.status_code == 400
     assert "not installed" in response.json()["message"]
