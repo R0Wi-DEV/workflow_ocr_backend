@@ -177,11 +177,36 @@ HaRP simplifies deployment and improves performance by enabling direct communica
 
 For installation and migration instructions, see the [HaRP documentation](https://github.com/nextcloud/HaRP#readme).
 
-## OCR Parameter Validation
+## OCR API
 
-The `ocrmypdf_parameters` sent to `/process_ocr` are validated before they are handed over to OCRmyPDF:
+`POST /v1/ocr` is the current API: a multipart `file` plus an `options` part holding a JSON object
+validated against a typed, closed schema (`OcrOptions`, see
+[`workflow_ocr_backend/ocroptions.py`](workflow_ocr_backend/ocroptions.py) and
+[`doc/DESIGN.md`](doc/DESIGN.md) for the full rationale). Unknown fields are rejected with `422`
+rather than forwarded, every scalar is bounded or enumerated, and resource limits (`jobs`,
+`max_image_mpixels`, the `tesseract_timeout` ceiling) are operator policy set via environment
+variables (`OCR_JOBS`, `OCR_MAX_IMAGE_MPIXELS`, `OCR_MAX_TESSERACT_TIMEOUT_S`), never part of the
+request body. See `/docs` on a running instance for the generated OpenAPI schema.
 
-- Only parameters on an explicit allow-list of documented [OCRmyPDF CLI options](https://ocrmypdf.readthedocs.io/en/latest/cookbook.html) are accepted. Unknown parameters are rejected with HTTP `400` instead of being silently ignored. The allow-list is a literal set rather than something derived from OCRmyPDF at runtime, so an OCRmyPDF upgrade can never widen it without review.
-- The parameters `plugins`, `plugin_manager`, `user_words`, `user_patterns`, `keep_temporary_files`, `tesseract_config` as well as the input/output/sidecar parameters (which are controlled by this app) are never accepted from a request. `--plugins` in particular would make OCRmyPDF load and execute arbitrary Python code; `--tesseract-config` and `--user-words` would expose the backend's filesystem to the caller.
-- CLI-only flags with no API equivalent (`--quiet`, `--verbose`, `--no-progress-bar`) are accepted and ignored rather than rejected.
-- Language codes must match `^[A-Za-z][A-Za-z0-9_/]{0,31}$` (e.g. `eng`, `chi_sim`, `script/Latin`), which is the same allow-list the [workflow_ocr](https://github.com/R0Wi-DEV/workflow_ocr) Nextcloud App uses.
+### Legacy `/process_ocr` (deprecated)
+
+`POST /process_ocr` accepts the older `ocrmypdf_parameters` flag string (e.g.
+`--skip-text --tesseract-pagesegmode 7 --language eng`) for backward compatibility. It is a thin
+shim: the string is parsed and translated onto the same `OcrOptions` schema `/v1/ocr` uses, so it
+inherits every validation rule from that schema rather than maintaining a separate allow/deny list.
+Responses carry `Deprecation`/`Sunset`/`Link` headers pointing at `/v1/ocr`. Concretely:
+
+- Only an explicit, hand-maintained table of legacy flag names is translated into schema fields.
+  A flag that isn't in that table - `plugins`, `plugin_manager`, `user_words`, `user_patterns`,
+  `keep_temporary_files`, `tesseract_config`, `unpaper_args`, the input/output/sidecar parameters,
+  and any operator-owned resource knob (`jobs`, `max_image_mpixels`) - can never reach OCRmyPDF,
+  because there is no path in the shim that puts it on the schema. `--plugins` in particular would
+  make OCRmyPDF load and execute arbitrary Python code; `--tesseract-config` and `--user-words`
+  would expose the backend's filesystem to the caller.
+- CLI-only flags with no API equivalent (`--quiet`, `--verbose`, `--no-progress-bar`) are accepted
+  and ignored rather than rejected.
+- Language codes must match `^[A-Za-z][A-Za-z0-9_]{0,31}$` (or `script/<Name>`, e.g. `chi_sim`,
+  `script/Latin`), the same allow-list the [workflow_ocr](https://github.com/R0Wi-DEV/workflow_ocr)
+  Nextcloud App uses.
+- Values are parsed with `shlex.split`, so a quoted value survives intact; duplicate flags and
+  unquoted multi-word values are now a `400` instead of being silently truncated or overwritten.

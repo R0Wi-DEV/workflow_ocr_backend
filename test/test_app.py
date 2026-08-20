@@ -107,6 +107,73 @@ def test_process_ocr_rejects_injected_language():
     assert response.status_code == 400
     assert response.json()["message"].startswith("Invalid language value '$(id)'")
 
+def test_process_ocr_deprecation_headers():
+    # The legacy endpoint is kept as a shim, but must advertise that it is one.
+    current_dir = os.path.dirname(__file__)
+    file_name = "document-ready-for-ocr.pdf"
+    with open(f"{current_dir}/testdata/{file_name}", "rb") as file, TestClient(APP, headers=headers) as client:
+        response = client.post(
+            "/process_ocr",
+            files={"file": (file_name, file, "application/pdf")},
+            data={"ocrmypdf_parameters": "--skip-text --language eng"}
+        )
+    assert response.status_code == 200
+    assert response.headers["Deprecation"] == "true"
+    assert "successor-version" in response.headers["Link"]
+
+def test_ocr_v1():
+    current_dir = os.path.dirname(__file__)
+    file_name = "document-ready-for-ocr.pdf"
+    ocr_content = "This document is ready for OCR\n"
+    with open(f"{current_dir}/testdata/{file_name}", "rb") as file, TestClient(APP, headers=headers) as client:
+        response = client.post(
+            "/v1/ocr",
+            files={"file": (file_name, file, "application/pdf")},
+            data={"options": '{"mode": "skip-text", "languages": ["eng"], "tesseract_pagesegmode": 7}'}
+        )
+    assert response.status_code == 200
+    response_json = response.json()
+    assert "recognizedText" in response_json
+    assert response_json["recognizedText"] == ocr_content
+
+def test_ocr_v1_defaults_to_english_when_no_options_given():
+    current_dir = os.path.dirname(__file__)
+    file_name = "document-ready-for-ocr.pdf"
+    ocr_content = "This document is ready for OCR\n"
+    with open(f"{current_dir}/testdata/{file_name}", "rb") as file, TestClient(APP, headers=headers) as client:
+        response = client.post(
+            "/v1/ocr",
+            files={"file": (file_name, file, "application/pdf")},
+            data={"options": '{"mode": "skip-text"}'}
+        )
+    assert response.status_code == 200
+    assert response.json()["recognizedText"] == ocr_content
+
+def test_ocr_v1_rejects_unknown_option_field():
+    # extra="forbid" - an unknown key is a 422, never silently forwarded.
+    current_dir = os.path.dirname(__file__)
+    file_name = "document-ready-for-ocr.pdf"
+    with open(f"{current_dir}/testdata/{file_name}", "rb") as file, TestClient(APP, headers=headers, raise_server_exceptions=False) as client:
+        response = client.post(
+            "/v1/ocr",
+            files={"file": (file_name, file, "application/pdf")},
+            data={"options": '{"plugins": "/tmp/evil.py"}'}
+        )
+    assert response.status_code == 422
+    assert response.json()["errors"][0]["loc"] == ["plugins"]
+
+def test_ocr_v1_rejects_uninstalled_language():
+    current_dir = os.path.dirname(__file__)
+    file_name = "document-ready-for-ocr.pdf"
+    with open(f"{current_dir}/testdata/{file_name}", "rb") as file, TestClient(APP, headers=headers, raise_server_exceptions=False) as client:
+        response = client.post(
+            "/v1/ocr",
+            files={"file": (file_name, file, "application/pdf")},
+            data={"options": '{"languages": ["jpn"]}'}
+        )
+    assert response.status_code == 400
+    assert "not installed" in response.json()["message"]
+
 def test_installed_languages():
     with TestClient(APP, headers=headers) as client:
         response = client.get("/installed_languages")
