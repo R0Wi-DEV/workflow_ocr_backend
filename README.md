@@ -10,6 +10,8 @@ It's written in Python and provides a simple REST API for [ocrmypdf](https://ocr
   - [Installation](#installation)
   - [`docker-compose` Example](#docker-compose-example)
   - [HaRP Support (Nextcloud 32+)](#harp-support-nextcloud-32)
+  - [OCR API](#ocr-api)
+    - [Legacy `/process_ocr` (deprecated)](#legacy-process_ocr-deprecated)
 
 ## Prerequisites
 
@@ -175,3 +177,37 @@ Since Nextcloud 32, [HaRP (AppAPI HaProxy Reversed Proxy)](https://github.com/ne
 HaRP simplifies deployment and improves performance by enabling direct communication between clients and ExApps. The implementation is fully backward compatible with Docker Socket Proxy deployments.
 
 For installation and migration instructions, see the [HaRP documentation](https://github.com/nextcloud/HaRP#readme).
+
+## OCR API
+
+`POST /v1/ocr` is the current API: a multipart `file` plus an `options` part holding a JSON object
+validated against a typed, closed schema (`OcrOptions`, see
+[`workflow_ocr_backend/ocroptions.py`](workflow_ocr_backend/ocroptions.py)). Unknown fields are
+rejected with `422` rather than forwarded, every scalar is bounded or enumerated, and resource
+limits (`jobs`,
+`max_image_mpixels`, the `tesseract_timeout` ceiling) are operator policy set via environment
+variables (`OCR_JOBS`, `OCR_MAX_IMAGE_MPIXELS`, `OCR_MAX_TESSERACT_TIMEOUT_S`), never part of the
+request body. See `/docs` on a running instance for the generated OpenAPI schema.
+
+### Legacy `/process_ocr` (deprecated)
+
+`POST /process_ocr` accepts the older `ocrmypdf_parameters` flag string (e.g.
+`--skip-text --tesseract-pagesegmode 7 --language eng`) for backward compatibility. It is a thin
+shim: the string is parsed and translated onto the same `OcrOptions` schema `/v1/ocr` uses, so it
+inherits every validation rule from that schema rather than maintaining a separate allow/deny list.
+Responses carry `Deprecation`/`Sunset`/`Link` headers pointing at `/v1/ocr`. Concretely:
+
+- Only an explicit, hand-maintained table of legacy flag names is translated into schema fields.
+  A flag that isn't in that table - `plugins`, `plugin_manager`, `user_words`, `user_patterns`,
+  `keep_temporary_files`, `tesseract_config`, `unpaper_args`, the input/output/sidecar parameters,
+  and any operator-owned resource knob (`jobs`, `max_image_mpixels`) - can never reach OCRmyPDF,
+  because there is no path in the shim that puts it on the schema. `--plugins` in particular would
+  make OCRmyPDF load and execute arbitrary Python code; `--tesseract-config` and `--user-words`
+  would expose the backend's filesystem to the caller.
+- CLI-only flags with no API equivalent (`--quiet`, `--verbose`, `--no-progress-bar`) are accepted
+  and ignored rather than rejected.
+- Language codes must match `^[A-Za-z][A-Za-z0-9_]{0,31}$` (or `script/<Name>`, e.g. `chi_sim`,
+  `script/Latin`), the same allow-list the [workflow_ocr](https://github.com/R0Wi-DEV/workflow_ocr)
+  Nextcloud App uses.
+- Values are parsed with `shlex.split`, so a quoted value survives intact; duplicate flags and
+  unquoted multi-word values are now a `400` instead of being silently truncated or overwritten.
