@@ -11,7 +11,7 @@ import logging
 from ocrmypdf import ExitCodeException
 
 from .model.ocrresult import ErrorResult, OcrResult
-from .ocrservice import OcrService
+from .ocrservice import InvalidOcrParameterError, OcrService
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -33,6 +33,11 @@ async def enabled_handler(enabled: bool, _: AsyncNextcloudApp) -> str:
 async def exit_code_exception_handler(_: Request, exc: ExitCodeException):
     return JSONResponse({"message": f"{str(exc)} ({exc.__class__.__name__})", "ocrMyPdfExitCode": exc.exit_code}, status_code=500)
 
+@APP.exception_handler(InvalidOcrParameterError)
+async def invalid_ocr_parameter_exception_handler(_: Request, exc: InvalidOcrParameterError):
+    # The caller sent an OCR parameter which is not allowed -> client error.
+    return JSONResponse({"message": f"{str(exc)} ({exc.__class__.__name__})"}, status_code=400)
+
 @APP.exception_handler(Exception)
 async def exception_handler(_: Request, exc: Exception):
     # Exception will be logged by uvicorn automatically.
@@ -40,7 +45,7 @@ async def exception_handler(_: Request, exc: Exception):
     return JSONResponse({"message": f"{str(exc)} ({exc.__class__.__name__})"}, status_code=500)
 
 
-@APP.post("/process_ocr", response_model=OcrResult, responses={500: {"model": ErrorResult}})
+@APP.post("/process_ocr", response_model=OcrResult, responses={400: {"model": ErrorResult}, 500: {"model": ErrorResult}})
 async def process_ocr(
         file: UploadFile = File(..., description="The file to be processed using OCR."), 
         ocrmypdf_parameters: str = Form(None, description="Additional parameters for the OCRmyPdf process (see https://ocrmypdf.readthedocs.io/en/latest/cookbook.html#basic-examples).")
