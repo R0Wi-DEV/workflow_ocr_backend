@@ -1,0 +1,21 @@
+{
+  "_comment": "Snapshot of ocrmypdf.ocr() keyword-only parameters. Regenerate DELIBERATELY after reviewing each added parameter for path/plugin/argv semantics.",
+  "ocrmypdf_version": "17.4.2",
+  "keyword_only_parameters": [
+    "author", "clean", "clean_final", "color_conversion_strategy",
+    "continue_on_soft_render_error", "deskew", "fast_web_view", "force_ocr",
+    "image_dpi", "invalidate_digital_signatures", "jbig2_lossy",
+    "jbig2_page_group_size", "jbig2_threshold", "jobs", "jpg_quality",
+    "keep_temporary_files", "keywords", "language",
+    "max_image_mpixels", "mode", "no_overwrite", "optimize", "output_type",
+    "oversample", "pages", "pdf_renderer", "pdfa_image_compression",
+    "plugin_manager", "plugins", "png_quality", "progress_bar", "rasterizer",
+    "redo_ocr", "remove_background", "remove_vectors", "rotate_pages",
+    "rotate_pages_threshold", "sidecar", "skip_big", "skip_text", "subject",
+    "tagged_pdf_mode", "tesseract_config", "tesseract_downsample_above",
+    "tesseract_downsample_large_images", "tesseract_non_ocr_timeout",
+    "tesseract_oem", "tesseract_pagesegmode", "tesseract_thresholding",
+    "tesseract_timeout", "title", "unpaper_args", "use_threads", "user_patterns",
+    "user_words"
+  ]
+}
