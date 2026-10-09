@@ -77,6 +77,36 @@ def test_process_ocr_error_invalid_file():
     assert "ocrMyPdfExitCode" in response_json
     assert response_json["ocrMyPdfExitCode"] == 2
 
+def test_process_ocr_rejects_plugin_parameter(tmp_path):
+    # The "plugins" parameter would make OCRmyPDF load and execute an arbitrary
+    # Python file => must be rejected before ocrmypdf.ocr() is called.
+    current_dir = os.path.dirname(__file__)
+    file_name = "document-ready-for-ocr.pdf"
+    marker = tmp_path / "pwned"
+    plugin = tmp_path / "evil_plugin.py"
+    plugin.write_text(f"open({str(marker)!r}, 'w').write('pwned')\n")
+    with open(f"{current_dir}/testdata/{file_name}", "rb") as file, TestClient(APP, headers=headers, raise_server_exceptions=False) as client:
+        response = client.post(
+            "/process_ocr",
+            files={"file": (file_name, file, "application/pdf")},
+            data={"ocrmypdf_parameters": f"--skip-text --plugins {plugin}"}
+        )
+    assert response.status_code == 400
+    assert response.json()["message"].startswith("Parameter 'plugins' is not allowed")
+    assert not marker.exists()
+
+def test_process_ocr_rejects_injected_language():
+    current_dir = os.path.dirname(__file__)
+    file_name = "document-ready-for-ocr.pdf"
+    with open(f"{current_dir}/testdata/{file_name}", "rb") as file, TestClient(APP, headers=headers, raise_server_exceptions=False) as client:
+        response = client.post(
+            "/process_ocr",
+            files={"file": (file_name, file, "application/pdf")},
+            data={"ocrmypdf_parameters": "--skip-text --language eng+$(id)"}
+        )
+    assert response.status_code == 400
+    assert response.json()["message"].startswith("Invalid language value '$(id)'")
+
 def test_installed_languages():
     with TestClient(APP, headers=headers) as client:
         response = client.get("/installed_languages")
